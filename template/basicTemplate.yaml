@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Simple EC2 deployment with nginx using CloudFormation
+
+Parameters:
+  SecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group allowing HTTP
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public Subnet ID
+
+Resources:
+  WebServer:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0c02fb55956c7d316
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref SecurityGroupId
+      SubnetId: !Ref PublicSubnet
+
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          amazon-linux-extras install nginx1 -y
+          systemctl start nginx
+          systemctl enable nginx
+
+Outputs:
+  Website:
+    Description: URL of nginx server
+    Value: !Sub "http://${WebServer.PublicIp}"
