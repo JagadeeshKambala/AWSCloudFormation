@@ -1,34 +1,64 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Simple EC2 deployment with nginx using CloudFormation
+Description: Intermediate EC2 deployment with nginx using CloudFormation
 
 Parameters:
-  SecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: Security Group allowing HTTP
+  VpcId:
+    Type: AWS::EC2::VPC::Id
 
   PublicSubnet:
     Type: AWS::EC2::Subnet::Id
-    Description: Public Subnet ID
+
+  KeyPair:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  InstanceType:
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - t3.micro
+      - t3.small
 
 Resources:
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and SSH
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
   WebServer:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: ami-0c02fb55956c7d316
-      InstanceType: t2.micro
-      SecurityGroupIds:
-        - !Ref SecurityGroupId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPair
       SubnetId: !Ref PublicSubnet
-
+      SecurityGroupIds:
+        - !Ref WebSecurityGroup
+      ImageId: !Sub "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+      Tags:
+        - Key: Name
+          Value: nginx-cloudformation-instance
       UserData:
         Fn::Base64: |
           #!/bin/bash
           yum update -y
-          amazon-linux-extras install nginx1 -y
+          yum install -y nginx
           systemctl start nginx
           systemctl enable nginx
+          echo "<h1>Deployed using CloudFormation</h1>" > /usr/share/nginx/html/index.html
 
 Outputs:
-  Website:
-    Description: URL of nginx server
+  WebsiteURL:
     Value: !Sub "http://${WebServer.PublicIp}"
+
+  InstanceId:
+    Value: !Ref WebServer
